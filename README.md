@@ -4,6 +4,74 @@ Sonarr + Radarr + Prowlarr + Bazarr in one app with a modern web UI.
 Add a show or movie once and Omniarr finds it on your indexers, sends it to qBittorrent,
 renames it into your library and fetches English subtitles.
 
+### Docker Compose file
+
+Copy this whole block into UGREEN's **Docker → Project → Create**. It's the same as
+[`docker-compose.ugreen.yml`](docker-compose.ugreen.yml).
+
+```yaml
+# Omniarr for UGREEN NAS (UGOS Pro → Docker → Project → Create → paste this)
+#
+# Before you start:
+#   1. In the Files app create these folders (all on the SAME volume so hardlinks work):
+#        /volume1/docker/omniarr          ← Omniarr's settings & database
+#        /volume1/data/torrents           ← qBittorrent downloads here
+#        /volume1/data/media/tv           ← TV library   (point Plex/Jellyfin here)
+#        /volume1/data/media/movies       ← Movie library
+#   2. Check PUID/PGID: SSH in and run `id`. On UGOS the first user is usually uid=1000, gid=10.
+#   3. Deploy, then open http://<NAS-IP>:8484
+
+services:
+  omniarr:
+    image: ghcr.io/fudgeamin99/omniarr:latest
+    container_name: omniarr
+    environment:
+      - PUID=1000
+      - PGID=10
+      - UMASK=002
+      - TZ=Europe/London
+    volumes:
+      - /volume1/docker/omniarr:/config
+      - /volume1/data:/data
+    ports:
+      - "8484:8484"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - flaresolverr
+    restart: unless-stopped
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=info
+      - TZ=Europe/London
+    restart: unless-stopped
+
+  # qBittorrent — remove this block if you already run qBittorrent on the NAS.
+  # In Omniarr use address http://qbittorrent:8080
+  # First login: username admin, temporary password from the container log (Docker → qbittorrent → Log).
+  # Then in qBittorrent: Options → Downloads → Default Save Path = /data/torrents
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=10
+      - UMASK=002
+      - TZ=Europe/London
+      - WEBUI_PORT=8080
+    volumes:
+      - /volume1/docker/qbittorrent:/config
+      - /volume1/data:/data
+    ports:
+      - "8080:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+```
+
 ## What it does
 
 - **TV and movies in one library.** Show info comes from TVMaze (no key needed); movie info from TMDB (free key).
@@ -52,7 +120,7 @@ hardlinked into your library (instant, no extra space, keeps seeding):
 ### 2. Deploy
 
 1. Open **Docker → Project → Create** and name it `omniarr`.
-2. Paste in the contents of [`docker-compose.ugreen.yml`](docker-compose.ugreen.yml).
+2. Paste in the [Docker Compose file](#docker-compose-file) from the top of this page.
    - It runs as **PUID 1000 / PGID 10**, the usual first user on UGOS. If you've added users, SSH in, run `id`,
      and change the numbers for both `omniarr` and `qbittorrent` to match.
    - Already running qBittorrent on the NAS? Delete the `qbittorrent:` block and see
