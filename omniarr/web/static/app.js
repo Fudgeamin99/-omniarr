@@ -1028,12 +1028,17 @@ function unblockSection() {
         <b>Proxy (if your internet provider blocks a site)</b>
         <span class="small muted">Blocked sites are sent through this automatically. The docker-compose file includes a free one (Cloudflare WARP): <span class="mono">http://warp:1080</span>. A VPN provider's SOCKS5 proxy works too.</span>
         ${field('Proxy address', input('form.unblock.proxy_url', { placeholder: 'http://warp:1080' }))}
+        ${S.ui.proxyResult ? html`<span class="tiny" style="color:${S.ui.proxyResult.ok ? 'var(--green-text)' : 'var(--red-text)'}">${S.ui.proxyResult.message}</span>` : ''}
+        <div>${btn('Test proxy', 'testProxy', { cls: 'sm', busyKey: 'testProxy' })}</div>
         ${check('form.unblock.detect_isp_block', 'Spot internet-provider block pages')}
         ${check('form.unblock.auto_proxy', 'Automatically route blocked sites through the proxy')}
       </div>
     </div>
   </section>`;
 }
+A.testProxy = () => busy('testProxy', async () => {
+  try { const r = await api('/api/test/proxy', { method: 'POST', body: { url: S.form.unblock.proxy_url } }); S.ui.proxyResult = { ok: true, message: r.message }; } catch (e) { S.ui.proxyResult = { ok: false, message: e.message }; }
+});
 A.testFs = () => busy('testFs', async () => {
   try { const r = await api('/api/test/flaresolverr', { method: 'POST', body: { url: S.form.unblock.flaresolverr_url } }); S.ui.fsResult = { ok: true, message: r.message }; } catch (e) { S.ui.fsResult = { ok: false, message: e.message }; }
 });

@@ -79,6 +79,39 @@ CERT_BLOCK_MSG = ("Your internet provider is blocking this site (its security ce
                   "Staying unblocked → Proxy.")
 
 
+def proxy_problem(proxy: str, e: BaseException) -> str:
+    host = httpx.URL(proxy).host
+    text = str(e)
+    if "Name or service not known" in text or "getaddrinfo" in text or "nodename" in text:
+        return (f"Couldn't find the proxy '{host}'. Check the '{host}' container is running and is in the same "
+                f"Docker project as Omniarr (Docker → Containers), then press Test proxy in Connections.")
+    if "refused" in text.lower() or "all connection attempts failed" in text.lower():
+        return f"The proxy at {proxy} refused the connection — it may still be starting. Check its log."
+    return f"The proxy at {proxy} didn't work: {text or e.__class__.__name__}"
+
+
+async def test_proxy(proxy: str) -> str:
+    """Fetch Cloudflare's trace page through the proxy and report the exit IP / WARP status."""
+    c = httpx.AsyncClient(proxy=proxy, timeout=httpx.Timeout(20.0, connect=10.0), trust_env=False,
+                          verify=ssl_context())
+    try:
+        r = await c.get("https://www.cloudflare.com/cdn-cgi/trace")
+    except httpx.ProxyError as e:
+        raise IndexerError("proxy", proxy_problem(proxy, e)) from e
+    except httpx.ConnectError as e:
+        raise IndexerError("proxy", proxy_problem(proxy, e)) from e
+    except httpx.HTTPError as e:
+        raise IndexerError("proxy", f"The proxy answered, but the test page didn't load ({e.__class__.__name__}).") \
+            from e
+    finally:
+        await c.aclose()
+    info = dict(line.split("=", 1) for line in r.text.splitlines() if "=" in line)
+    warp = info.get("warp", "off")
+    where = info.get("loc", "?")
+    return f"Working — traffic leaves via {info.get('ip', '?')} ({where})" + \
+        (", Cloudflare WARP is on" if warp in ("on", "plus") else "")
+
+
 def client(proxy: str | None = None, timeout: float = 30.0) -> httpx.AsyncClient:
     key = f"{proxy or ''}|{timeout}"
     c = _clients.get(key)
@@ -294,9 +327,11 @@ class Session:
                     resp = await c.request(current_method, current_url, params=qp,
                                            data=body if current_method != "GET" else None, headers=h)
             except httpx.ProxyError as e:
-                raise IndexerError("network", f"The proxy didn't work: {e}") from e
+                raise IndexerError("proxy", proxy_problem(proxy, e)) from e
             except httpx.ConnectError as e:
                 msg = str(e)
+                if proxy and not is_cert_error(e):
+                    raise IndexerError("proxy", proxy_problem(proxy, e)) from e
                 if is_cert_error(e):
                     raise IndexerError("isp_block", CERT_BLOCK_MSG) from e
                 if "Name or service not known" in msg or "nodename" in msg or "getaddrinfo" in msg:

@@ -713,6 +713,18 @@ async def test_flaresolverr(request: Request):
 
 
 @endpoint
+async def test_proxy(request: Request):
+    data = await body(request)
+    url = data.get("url") or settings.get("unblock").get("proxy_url")
+    if not url:
+        raise ApiError("Enter a proxy address first, e.g. http://warp:1080")
+    try:
+        return {"ok": True, "message": await net.test_proxy(url)}
+    except net.IndexerError as e:
+        raise ApiError(e.message)
+
+
+@endpoint
 async def test_tmdb(request: Request):
     data = await body(request)
     key = data.get("key")
@@ -953,6 +965,7 @@ routes = [
     Route("/api/test/qbittorrent", test_qbit, methods=["POST"]),
     Route("/api/test/flaresolverr", test_flaresolverr, methods=["POST"]),
     Route("/api/test/tmdb", test_tmdb, methods=["POST"]),
+    Route("/api/test/proxy", test_proxy, methods=["POST"]),
     Route("/api/test/subtitles", test_subtitle_provider, methods=["POST"]),
     Route("/api/naming/preview", naming_preview, methods=["POST"]),
     Route("/api/setup/dismiss", dismiss_setup, methods=["POST"]),
