@@ -593,7 +593,7 @@ class CardigannIndexer:
         if r.status >= 400:
             if r.status in (401, 403) and self.defn.login:
                 raise _LoggedOut()
-            raise IndexerError("http", f"The site answered HTTP {r.status}.")
+            raise IndexerError("http", http_error_message(r))
         resp_def = pdef.get("response") or {}
         rtype = (resp_def.get("type") or "html").lower()
         text = r.text
@@ -927,6 +927,23 @@ class CardigannIndexer:
         q = self.build_query("tv" if "tv" in self.defn.kinds() else "movies", "")
         rels = await self.search(q)
         return len(rels)
+
+
+def http_error_message(r: Resp) -> str:
+    """'The site answered HTTP 400 for /search/... — <title or first words of the page>'."""
+    path = urlparse(r.url).path or "/"
+    if len(path) > 60:
+        path = path[:57] + "..."
+    text = r.text[:20000]
+    snippet = ""
+    try:
+        soup = BeautifulSoup(text, "lxml")
+        snippet = (soup.title.get_text(" ", strip=True) if soup.title else "") or soup.get_text(" ", strip=True)
+    except Exception:
+        snippet = text
+    snippet = re.sub(r"\s+", " ", snippet).strip()[:140]
+    L.warning("HTTP %s from %s — %s", r.status, r.url, snippet)
+    return f"The site answered HTTP {r.status} for {path}" + (f" — \"{snippet}\"" if snippet else "") + "."
 
 
 def _self_matches(el, sel: str) -> bool:

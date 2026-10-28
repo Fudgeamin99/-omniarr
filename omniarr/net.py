@@ -262,16 +262,30 @@ class Session:
         hdrs = {"User-Agent": self.user_agent or config.USER_AGENT,
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7",
                 "Accept-Language": "en-US,en;q=0.9"}
-        hdrs.update(self.headers)
-        hdrs.update(headers or {})
+        # merge case-insensitively so a definition's "cookie"/"user-agent" never duplicates ours
+        extra_cookie = ""
+        for src in (self.headers, headers or {}):
+            for k, v in src.items():
+                if k.lower() == "cookie":
+                    extra_cookie = "; ".join(x for x in (extra_cookie, str(v)) if x)
+                    continue
+                for existing in [x for x in hdrs if x.lower() == k.lower()]:
+                    del hdrs[existing]
+                hdrs[k] = v
         proxy = self._proxy()
         c = client(proxy)
         current_url, current_method, body, qp = url, method.upper(), data, params
         resp: httpx.Response | None = None
         for _hop in range(10):
             h = dict(hdrs)
-            if self.cookies:
-                h["Cookie"] = self.cookie_header()
+            jar = {}
+            for part in extra_cookie.split(";"):
+                if "=" in part:
+                    k, v = part.split("=", 1)
+                    jar[k.strip()] = v.strip()
+            jar.update(self.cookies)          # cookies the site set win over the definition's defaults
+            if jar:
+                h["Cookie"] = "; ".join(f"{k}={v}" for k, v in jar.items())
             try:
                 if raw_body is not None and current_method == "POST":
                     h.setdefault("Content-Type", "application/x-www-form-urlencoded")

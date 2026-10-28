@@ -77,3 +77,35 @@ async def test_blocked_site_switches_to_proxy():
     finally:
         site.shutdown()
         proxy.shutdown()
+
+
+class Echo(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        cookies = self.headers.get_all("Cookie") or []
+        uas = self.headers.get_all("User-Agent") or []
+        if len(cookies) > 1 or len(uas) > 1:
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b"<html><head><title>400 Bad Request</title></head></html>")
+            return
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(("|".join(cookies) + "#" + "|".join(uas)).encode())
+
+    def log_message(self, *a):
+        pass
+
+
+async def test_definition_cookie_merged_with_site_cookies():
+    srv = _serve(Echo, 18773)
+    try:
+        s = net.Session(key="t3", name="eztv-like")
+        s.cookies = {"cf_clearance": "abc", "sort_no": "50"}
+        r = await s.request("GET", "http://127.0.0.1:18773/", polite=False,
+                            headers={"cookie": "sort_no=100; layout=def_wlinks", "user-agent": "X/1"})
+        assert r.status == 200, r.text
+        cookie, ua = r.text.split("#")
+        assert "cf_clearance=abc" in cookie and "layout=def_wlinks" in cookie and "sort_no=50" in cookie, cookie
+        assert ua == "X/1"
+    finally:
+        srv.shutdown()
