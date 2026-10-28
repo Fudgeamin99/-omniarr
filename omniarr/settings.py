@@ -1,5 +1,6 @@
 """User settings, stored as JSON per section in the settings table."""
 import copy
+import os
 from typing import Any
 
 from . import db
@@ -55,7 +56,8 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "daily_limits": True,
         "backoff": True,
         "cache_minutes": 30,
-        "proxy_url": "",
+        "proxy_url": os.environ.get("OMNIARR_DEFAULT_PROXY", ""),
+        "auto_proxy": True,
         "detect_isp_block": True,
     },
     "search": {

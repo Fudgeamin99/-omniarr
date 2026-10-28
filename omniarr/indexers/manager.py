@@ -40,6 +40,12 @@ def _session(row: dict) -> Session:
         db.update("indexers", iid, {"flaresolverr": 1 if on else 0})
         L.info("Turned on Cloudflare bypass for indexer %s (site started showing a browser check)", row["name"])
     s.on_flaresolverr_needed = _auto_fs
+
+    def _auto_proxy(on: bool, iid=iid):
+        if iid:
+            db.update("indexers", iid, {"use_proxy": 1 if on else 0})
+            L.info("Turned on 'Route through proxy' for indexer %s (blocked by the internet provider)", row["name"])
+    s.on_proxy_needed = _auto_proxy
     return s
 
 
@@ -226,6 +232,7 @@ async def test(row: dict) -> dict[str, Any]:
     if row.get("id"):
         _record_ok(row, ms, idx.session)
     return {"ok": True, "results": n, "ms": ms, "flaresolverr": idx.session.use_flaresolverr,
+            "use_proxy": idx.session.use_proxy,
             "cookies": idx.session.cookies, "user_agent": idx.session.user_agent}
 
 

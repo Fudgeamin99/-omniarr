@@ -21,6 +21,7 @@ services:
       - PGID=1000            # `id -g` on the host
       - UMASK=002
       - TZ=Europe/London
+      - OMNIARR_DEFAULT_PROXY=http://warp:1080
     volumes:
       - ./config:/config                 # database, logs, settings
       - /srv/data:/data                  # CHANGE ME: the folder holding torrents/ and media/
@@ -33,9 +34,31 @@ services:
       - "host.docker.internal:host-gateway"   # lets Omniarr reach a qBittorrent running on this machine
     depends_on:
       - flaresolverr
+      - warp
     restart: unless-stopped
 
   # Solves Cloudflare "checking your browser" pages. Omniarr only uses it for sites that need it.
+  # Free Cloudflare WARP tunnel. Blocked sites are routed through it automatically,
+  # so your internet provider can't block your searches. No account needed.
+  # (Only Omniarr's searches go through it — qBittorrent's downloads don't.)
+  warp:
+    image: caomingjun/warp:latest
+    container_name: warp
+    device_cgroup_rules:
+      - 'c 10:200 rwm'
+    cap_add:
+      - MKNOD
+      - AUDIT_WRITE
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    environment:
+      - WARP_SLEEP=2
+    volumes:
+      - ./warp:/var/lib/cloudflare-warp
+    restart: unless-stopped
+
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
     container_name: flaresolverr

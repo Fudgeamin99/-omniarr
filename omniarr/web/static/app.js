@@ -1026,9 +1026,10 @@ function unblockSection() {
       </div>
       <div class="col" style="background:var(--card2);border-radius:12px;padding:16px;gap:10px">
         <b>Proxy (if your internet provider blocks a site)</b>
-        <span class="small muted">Optional. Turn on "Route through proxy" for the indexers that need it, e.g. via your VPN provider's SOCKS5 proxy.</span>
-        ${field('Proxy address', input('form.unblock.proxy_url', { placeholder: 'socks5://user:pass@host:1080' }))}
-        ${check('form.unblock.detect_isp_block', 'Spot internet-provider block pages and suggest the proxy')}
+        <span class="small muted">Blocked sites are sent through this automatically. The docker-compose file includes a free one (Cloudflare WARP): <span class="mono">http://warp:1080</span>. A VPN provider's SOCKS5 proxy works too.</span>
+        ${field('Proxy address', input('form.unblock.proxy_url', { placeholder: 'http://warp:1080' }))}
+        ${check('form.unblock.detect_isp_block', 'Spot internet-provider block pages')}
+        ${check('form.unblock.auto_proxy', 'Automatically route blocked sites through the proxy')}
       </div>
     </div>
   </section>`;
@@ -1243,12 +1244,12 @@ function indexerModal(m) {
       <div class="row">${btn('Test', 'testIndexer', { busyKey: 'testIndexer' })}${btn('Save', 'saveIndexer', { cls: 'primary', busyKey: 'saveIndexer' })}</div></div>`;
 }
 function testResultNotice(r) {
-  if (r.ok) return html`<div class="notice good">Working — ${plural(r.results, 'recent release')} found in ${(r.ms / 1000).toFixed(1)} s${r.flaresolverr ? ' (Cloudflare bypass was needed and is now on)' : ''}.</div>`;
+  if (r.ok) return html`<div class="notice good">Working — ${plural(r.results, 'recent release')} found in ${(r.ms / 1000).toFixed(1)} s${r.flaresolverr ? ' (Cloudflare bypass was needed and is now on)' : ''}${r.use_proxy ? ' (blocked by your internet provider — going through the proxy)' : ''}.</div>`;
   return html`<div class="notice bad">${r.message}</div>`;
 }
 A.testIndexer = () => busy('testIndexer', async () => {
   const r = await api('/api/indexers/test', { method: 'POST', body: S.modal.form });
-  S.modal.result = r; if (r.flaresolverr) S.modal.form.flaresolverr = true;
+  S.modal.result = r; if (r.flaresolverr) S.modal.form.flaresolverr = true; if (r.use_proxy) S.modal.form.use_proxy = true;
 });
 A.saveIndexer = () => busy('saveIndexer', async () => {
   await api(`/api/indexers/${S.modal.form.id}`, { method: 'PUT', body: S.modal.form });
@@ -1333,12 +1334,12 @@ function indexerSetupPanel(x) {
 }
 A.ixTest = () => busy('ixTest', async () => {
   const r = await api('/api/indexers/test', { method: 'POST', body: S.ix.form });
-  S.ix.result = r; if (r.flaresolverr) S.ix.form.flaresolverr = true;
+  S.ix.result = r; if (r.flaresolverr) S.ix.form.flaresolverr = true; if (r.use_proxy) S.ix.form.use_proxy = true;
 });
 A.ixAdd = () => busy('ixAdd', async () => {
   if (!S.ix.result || S.ix.result.ok) {
     const r = await api('/api/indexers/test', { method: 'POST', body: S.ix.form });
-    S.ix.result = r; if (r.flaresolverr) S.ix.form.flaresolverr = true;
+    S.ix.result = r; if (r.flaresolverr) S.ix.form.flaresolverr = true; if (r.use_proxy) S.ix.form.use_proxy = true;
     if (!r.ok) { render(); return; }
   }
   await api('/api/indexers', { method: 'POST', body: S.ix.form });

@@ -16,6 +16,7 @@ Copy this whole block into UGREEN's **Docker → Project → Create**. It's the 
 #   1. In the Files app create these folders (all on the SAME volume so hardlinks work):
 #        /volume1/docker/omniarr          ← Omniarr's settings & database
 #        /volume1/docker/qbittorrent      ← qBittorrent's settings
+#        /volume1/docker/warp             ← WARP tunnel settings
 #        /volume1/data/torrents           ← qBittorrent downloads here
 #        /volume1/data/media/tv           ← TV library   (point Plex/Jellyfin here)
 #        /volume1/data/media/movies       ← Movie library
@@ -31,6 +32,7 @@ services:
       - PGID=10
       - UMASK=002
       - TZ=Europe/London
+      - OMNIARR_DEFAULT_PROXY=http://warp:1080
     volumes:
       - /volume1/docker/omniarr:/config
       - /volume1/data:/data
@@ -43,6 +45,28 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - flaresolverr
+      - warp
+    restart: unless-stopped
+
+  # Free Cloudflare WARP tunnel. Blocked sites are routed through it automatically,
+  # so your internet provider can't block your searches. No account needed.
+  # (Only Omniarr's searches go through it — qBittorrent's downloads don't.)
+  warp:
+    image: caomingjun/warp:latest
+    container_name: warp
+    device_cgroup_rules:
+      - 'c 10:200 rwm'
+    cap_add:
+      - MKNOD
+      - AUDIT_WRITE
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    environment:
+      - WARP_SLEEP=2
+    volumes:
+      - /volume1/docker/warp:/var/lib/cloudflare-warp
     restart: unless-stopped
 
   flaresolverr:
@@ -121,6 +145,7 @@ hardlinked into your library (instant, no extra space, keeps seeding):
 ```
 /volume1/docker/omniarr          Omniarr's settings and database
 /volume1/docker/qbittorrent      qBittorrent's settings
+/volume1/docker/warp             WARP tunnel's settings
 /volume1/data/torrents           where qBittorrent downloads to
 /volume1/data/media/tv           TV library      (point Plex / Jellyfin here)
 /volume1/data/media/movies       Movie library   (point Plex / Jellyfin here)
@@ -134,7 +159,7 @@ hardlinked into your library (instant, no extra space, keeps seeding):
      and change the numbers for both `omniarr` and `qbittorrent` to match.
    - Already running qBittorrent on the NAS? Delete the `qbittorrent:` block and see
      [Using your existing qBittorrent](#using-your-existing-qbittorrent).
-3. Click **Deploy**. Three containers start: `omniarr`, `flaresolverr` and `qbittorrent`.
+3. Click **Deploy**. Four containers start: `omniarr`, `warp`, `flaresolverr` and `qbittorrent`.
 
 ### 3. Set up qBittorrent (the included one)
 
@@ -180,7 +205,7 @@ Every change pushed to this repo builds a new image. On the NAS go to **Docker �
 | History says "Copied" instead of "Hardlinked" | qBittorrent and Omniarr need the same PUID/PGID, and everything under one `/volume1/data` folder. |
 | Permission errors / files owned by root | PUID/PGID don't match your user — check with `id` over SSH. |
 | A site says "Needs Cloudflare bypass" | Make sure the `flaresolverr` container is running; Omniarr's default address `http://flaresolverr:8191` is correct. |
-| "Security certificate wasn't valid" / `CERTIFICATE_VERIFY_FAILED`, or a site looks blocked by your internet provider | UK providers block most public torrent sites. The compose file already uses public DNS (1.1.1.1), which gets around most blocks; redeploy if you set it up before this was added. If a site is still blocked, add a proxy (e.g. your VPN's SOCKS5) under Connections → Staying unblocked and tick "Route through proxy" on that indexer. |
+| "Security certificate wasn't valid" / `CERTIFICATE_VERIFY_FAILED`, or a site looks blocked by your internet provider | UK providers block most public torrent sites. The compose file includes a free Cloudflare WARP tunnel, and Omniarr sends blocked sites through it automatically. If you deployed before it was added: redeploy with the new compose file, then in Connections → Staying unblocked set **Proxy address** to `http://warp:1080`, Save, and press **Test** on the indexer. |
 | Anything else | **Activity → Logs** shows what happened. |
 
 ## Install (Docker Compose, build from source)

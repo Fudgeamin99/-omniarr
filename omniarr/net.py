@@ -73,10 +73,10 @@ def is_cert_error(e: BaseException) -> bool:
     return "CERTIFICATE_VERIFY_FAILED" in text or "certificate verify failed" in text.lower()
 
 
-CERT_BLOCK_MSG = ("The site's security certificate wasn't valid. This almost always means your internet provider is "
-                  "blocking the site and answering with its own page. Fixes: use the docker-compose file's DNS "
-                  "settings (1.1.1.1), or turn on 'Route through proxy' for this indexer with a VPN/SOCKS5 proxy "
-                  "in Connections → Staying unblocked.")
+CERT_BLOCK_MSG = ("Your internet provider is blocking this site (its security certificate was replaced). "
+                  "Omniarr routes blocked sites through the proxy automatically once one is set — the docker-compose "
+                  "file includes a free one (Cloudflare WARP, address http://warp:1080). Set it in Connections → "
+                  "Staying unblocked → Proxy.")
 
 
 def client(proxy: str | None = None, timeout: float = 30.0) -> httpx.AsyncClient:
@@ -202,6 +202,7 @@ class Session:
     encoding: str | None = None
     headers: dict = field(default_factory=dict)
     on_flaresolverr_needed: Any = None   # callback(bool) to persist auto-enable
+    on_proxy_needed: Any = None          # callback(bool) to persist "route through proxy"
     cf_detected: bool = False
     polite_by_host: bool = True          # space requests per website (Torznab proxies: per indexer)
 
@@ -230,7 +231,29 @@ class Session:
     def cookie_header(self) -> str:
         return "; ".join(f"{k}={v}" for k, v in self.cookies.items())
 
-    async def request(self, method: str, url: str, *, params: Any = None, data: Any = None,
+    async def request(self, method: str, url: str, **kw) -> Resp:
+        """Make a request; if the site looks blocked by the internet provider, retry through the proxy
+        (when one is set) and remember that this indexer needs it."""
+        try:
+            return await self._request(method, url, **kw)
+        except IndexerError as e:
+            if e.kind != "isp_block" or self.use_proxy or kw.get("_cf_retry"):
+                raise
+            cfg = settings.get("unblock")
+            if not cfg.get("proxy_url") or not cfg.get("auto_proxy", True):
+                raise
+            L.info("%s: looks blocked by the internet provider — retrying through the proxy", self.name)
+            self.use_proxy = True
+            try:
+                resp = await self._request(method, url, **{**kw, "polite": False})
+            except IndexerError:
+                self.use_proxy = False
+                raise
+            if self.on_proxy_needed:
+                self.on_proxy_needed(True)
+            return resp
+
+    async def _request(self, method: str, url: str, *, params: Any = None, data: Any = None,
                       headers: dict | None = None, follow: bool = True, polite: bool = True,
                       raw_body: str | None = None, _cf_retry: bool = False) -> Resp:
         if polite:
@@ -263,7 +286,7 @@ class Session:
                 if is_cert_error(e):
                     raise IndexerError("isp_block", CERT_BLOCK_MSG) from e
                 if "Name or service not known" in msg or "nodename" in msg or "getaddrinfo" in msg:
-                    raise IndexerError("network", "The site's address couldn't be found (DNS). It may be down, "
+                    raise IndexerError("isp_block", "The site's address couldn't be found (DNS). It may be down, "
                                                   "or blocked by your internet provider — try the proxy.") from e
                 raise IndexerError("network", f"Couldn't connect to the site ({msg or 'connection refused'}).") from e
             except httpx.TimeoutException as e:
