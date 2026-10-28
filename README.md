@@ -15,6 +15,7 @@ Copy this whole block into UGREEN's **Docker → Project → Create**. It's the 
 # Before you start:
 #   1. In the Files app create these folders (all on the SAME volume so hardlinks work):
 #        /volume1/docker/omniarr          ← Omniarr's settings & database
+#        /volume1/docker/qbittorrent      ← qBittorrent's settings
 #        /volume1/data/torrents           ← qBittorrent downloads here
 #        /volume1/data/media/tv           ← TV library   (point Plex/Jellyfin here)
 #        /volume1/data/media/movies       ← Movie library
