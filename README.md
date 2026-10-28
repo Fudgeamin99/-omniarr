@@ -28,7 +28,18 @@ renames it into your library and fetches English subtitles.
   - Stalled or failed downloads are blocked and another release is searched for.
   - Torrents are removed once the site's seeding goals are met.
 
-## Install (Docker Compose)
+## Install on a UGREEN NAS
+
+1. In **Files**, create `/volume1/docker/omniarr`, `/volume1/docker/qbittorrent`, `/volume1/data/torrents`,
+   `/volume1/data/media/tv` and `/volume1/data/media/movies`.
+2. Open **Docker → Project → Create**, name it `omniarr`, and paste in [`docker-compose.ugreen.yml`](docker-compose.ugreen.yml).
+   If you already run qBittorrent, delete the `qbittorrent:` block first.
+3. Deploy, then open `http://<NAS-IP>:8484`.
+
+The image is built automatically by GitHub Actions and published as `ghcr.io/fudgeamin99/omniarr:latest`
+(for Intel and ARM).
+
+## Install (Docker Compose, build from source)
 
 1. Put all your media and downloads under **one folder** on the host (e.g. `/srv/data`):
    ```
