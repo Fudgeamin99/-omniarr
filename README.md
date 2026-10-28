@@ -36,6 +36,9 @@ services:
       - /volume1/data:/data
     ports:
       - "8484:8484"
+    dns:                     # public DNS — gets around most UK internet-provider site blocks
+      - 1.1.1.1
+      - 1.0.0.1
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -45,6 +48,9 @@ services:
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
     container_name: flaresolverr
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
     environment:
       - LOG_LEVEL=info
       - TZ=Europe/London
@@ -174,7 +180,7 @@ Every change pushed to this repo builds a new image. On the NAS go to **Docker �
 | History says "Copied" instead of "Hardlinked" | qBittorrent and Omniarr need the same PUID/PGID, and everything under one `/volume1/data` folder. |
 | Permission errors / files owned by root | PUID/PGID don't match your user — check with `id` over SSH. |
 | A site says "Needs Cloudflare bypass" | Make sure the `flaresolverr` container is running; Omniarr's default address `http://flaresolverr:8191` is correct. |
-| A site looks blocked by your internet provider | Add a proxy (e.g. your VPN's SOCKS5) under Connections → Staying unblocked, then tick "Route through proxy" on that indexer. |
+| "Security certificate wasn't valid" / `CERTIFICATE_VERIFY_FAILED`, or a site looks blocked by your internet provider | UK providers block most public torrent sites. The compose file already uses public DNS (1.1.1.1), which gets around most blocks; redeploy if you set it up before this was added. If a site is still blocked, add a proxy (e.g. your VPN's SOCKS5) under Connections → Staying unblocked and tick "Route through proxy" on that indexer. |
 | Anything else | **Activity → Logs** shows what happened. |
 
 ## Install (Docker Compose, build from source)

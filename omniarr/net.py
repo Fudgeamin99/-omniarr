@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import ssl
 import time
 from dataclasses import dataclass, field
 from http.cookies import SimpleCookie
@@ -50,12 +51,40 @@ class Resp:
 _clients: dict[str, httpx.AsyncClient] = {}
 
 
+_ssl_ctx: ssl.SSLContext | None = None
+
+
+def ssl_context() -> ssl.SSLContext:
+    """System certificates plus the up-to-date Mozilla bundle (NAS images can ship an old store)."""
+    global _ssl_ctx
+    if _ssl_ctx is None:
+        ctx = ssl.create_default_context()
+        try:
+            import certifi
+            ctx.load_verify_locations(cafile=certifi.where())
+        except Exception:
+            pass
+        _ssl_ctx = ctx
+    return _ssl_ctx
+
+
+def is_cert_error(e: BaseException) -> bool:
+    text = f"{e} {e.__cause__ or ''} {e.__context__ or ''}"
+    return "CERTIFICATE_VERIFY_FAILED" in text or "certificate verify failed" in text.lower()
+
+
+CERT_BLOCK_MSG = ("The site's security certificate wasn't valid. This almost always means your internet provider is "
+                  "blocking the site and answering with its own page. Fixes: use the docker-compose file's DNS "
+                  "settings (1.1.1.1), or turn on 'Route through proxy' for this indexer with a VPN/SOCKS5 proxy "
+                  "in Connections → Staying unblocked.")
+
+
 def client(proxy: str | None = None, timeout: float = 30.0) -> httpx.AsyncClient:
     key = f"{proxy or ''}|{timeout}"
     c = _clients.get(key)
     if c is None or c.is_closed:
         c = httpx.AsyncClient(proxy=proxy or None, timeout=httpx.Timeout(timeout, connect=15.0),
-                              follow_redirects=False, trust_env=not proxy,
+                              follow_redirects=False, trust_env=not proxy, verify=ssl_context(),
                               limits=httpx.Limits(max_connections=50, max_keepalive_connections=10))
         _clients[key] = c
     return c
@@ -231,6 +260,8 @@ class Session:
                 raise IndexerError("network", f"The proxy didn't work: {e}") from e
             except httpx.ConnectError as e:
                 msg = str(e)
+                if is_cert_error(e):
+                    raise IndexerError("isp_block", CERT_BLOCK_MSG) from e
                 if "Name or service not known" in msg or "nodename" in msg or "getaddrinfo" in msg:
                     raise IndexerError("network", "The site's address couldn't be found (DNS). It may be down, "
                                                   "or blocked by your internet provider — try the proxy.") from e
