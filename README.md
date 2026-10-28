@@ -30,14 +30,81 @@ renames it into your library and fetches English subtitles.
 
 ## Install on a UGREEN NAS
 
-1. In **Files**, create `/volume1/docker/omniarr`, `/volume1/docker/qbittorrent`, `/volume1/data/torrents`,
-   `/volume1/data/media/tv` and `/volume1/data/media/movies`.
-2. Open **Docker → Project → Create**, name it `omniarr`, and paste in [`docker-compose.ugreen.yml`](docker-compose.ugreen.yml).
-   If you already run qBittorrent, delete the `qbittorrent:` block first.
-3. Deploy, then open `http://<NAS-IP>:8484`.
+### 0. One-time: make the image downloadable
 
-The image is built automatically by GitHub Actions and published as `ghcr.io/fudgeamin99/omniarr:latest`
-(for Intel and ARM).
+The image is built automatically by GitHub Actions on every update and published as
+`ghcr.io/fudgeamin99/omniarr:latest` (Intel and ARM). GitHub publishes new images as private, so make it public once:
+GitHub → your profile → **Packages** → **omniarr** → **Package settings** → **Change visibility** → **Public**.
+
+### 1. Create the folders
+
+In the **Files** app, create these. Keep them all on the same volume so finished downloads can be
+hardlinked into your library (instant, no extra space, keeps seeding):
+
+```
+/volume1/docker/omniarr          Omniarr's settings and database
+/volume1/docker/qbittorrent      qBittorrent's settings
+/volume1/data/torrents           where qBittorrent downloads to
+/volume1/data/media/tv           TV library      (point Plex / Jellyfin here)
+/volume1/data/media/movies       Movie library   (point Plex / Jellyfin here)
+```
+
+### 2. Deploy
+
+1. Open **Docker → Project → Create** and name it `omniarr`.
+2. Paste in the contents of [`docker-compose.ugreen.yml`](docker-compose.ugreen.yml).
+   - It runs as **PUID 1000 / PGID 10**, the usual first user on UGOS. If you've added users, SSH in, run `id`,
+     and change the numbers for both `omniarr` and `qbittorrent` to match.
+   - Already running qBittorrent on the NAS? Delete the `qbittorrent:` block and see
+     [Using your existing qBittorrent](#using-your-existing-qbittorrent).
+3. Click **Deploy**. Three containers start: `omniarr`, `flaresolverr` and `qbittorrent`.
+
+### 3. Set up qBittorrent (the included one)
+
+1. Open `http://<NAS-IP>:8080`. The username is `admin` and the temporary password is in
+   **Docker → Container → qbittorrent → Log**.
+2. **Tools → Options → Web UI**: set your own password.
+3. **Tools → Options → Downloads**: set **Default Save Path** to `/data/torrents`.
+
+### 4. Finish setup in Omniarr
+
+Open `http://<NAS-IP>:8484`. The dashboard shows a **Finish setup** card until everything is connected:
+
+- **Library folders:** already set to `/data/media/tv` and `/data/media/movies`. Nothing to do.
+- **Link qBittorrent:** Connections → qBittorrent → address `http://qbittorrent:8080`, plus the username and password
+  from step 3 → **Test and save**.
+- **Indexers:** Connections → **+ Add indexer** → pick your trackers → enter your login, cookie or API key →
+  **Test and add**.
+- **Movie info key:** create a free TMDB account → Settings → API → copy the key → Connections → Quality and info.
+- **Subtitles (optional):** Podnapisi works straight away. For OpenSubtitles.com (best coverage), add your free account
+  plus an API key from opensubtitles.com → Profile → API consumers.
+
+Then go to **Add new**, search for a show or movie, and press **Add to library**.
+
+### Updating
+
+Every change pushed to this repo builds a new image. On the NAS go to **Docker → Project → omniarr**, then
+**Pull image** / **Rebuild** (wording varies by UGOS version). Your settings in `/volume1/docker/omniarr` are kept.
+
+### Using your existing qBittorrent
+
+- **qBittorrent in Docker on the NAS:** give it the same `/volume1/data:/data` mount and the same PUID/PGID,
+  set its save path to `/data/torrents`, and use `http://<NAS-IP>:8080` as the address in Omniarr.
+- **qBittorrent on your PC:** use `http://<PC-IP>:8080`. Omniarr can't see your PC's disk, so after **Test and save** it will
+  ask for a **folder mapping**. The PC's download folder must be one Omniarr can reach (e.g. a NAS share mounted
+  on the PC), mapped to `/data/torrents`.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| Deploy fails with "denied" or "unauthorized" pulling the image | The package is still private — do step 0. |
+| "Can't see the downloaded files" in Activity | qBittorrent's save path isn't `/data/torrents`, or it doesn't have the `/volume1/data:/data` mount. |
+| History says "Copied" instead of "Hardlinked" | qBittorrent and Omniarr need the same PUID/PGID, and everything under one `/volume1/data` folder. |
+| Permission errors / files owned by root | PUID/PGID don't match your user — check with `id` over SSH. |
+| A site says "Needs Cloudflare bypass" | Make sure the `flaresolverr` container is running; Omniarr's default address `http://flaresolverr:8191` is correct. |
+| A site looks blocked by your internet provider | Add a proxy (e.g. your VPN's SOCKS5) under Connections → Staying unblocked, then tick "Route through proxy" on that indexer. |
+| Anything else | **Activity → Logs** shows what happened. |
 
 ## Install (Docker Compose, build from source)
 
@@ -88,7 +155,7 @@ Podnapisi works without an account. OpenSubtitles.com has the best coverage. It 
   films, "English only" means an English dub is required. Switch that title to "Any language" if you'd rather have subtitles.
 - **Pick a release myself** on any show, season or episode lists every result, with the reason any were rejected.
   You can still download a rejected one.
-- Data lives in `./config` (SQLite database, logs, site definitions). Back that folder up.
+- Data lives in `/config` inside the container (`/volume1/docker/omniarr` on a UGREEN). It holds the SQLite database, logs and site definitions. Back that folder up.
 - Optional login: Connections → Login.
 
 ## Running without Docker
