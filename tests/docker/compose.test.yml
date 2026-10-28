@@ -1,0 +1,24 @@
+services:
+  omniarr:
+    build: {context: ../.., dockerfile: tests/docker/Dockerfile.localtest}
+    image: omniarr:localtest
+    environment:
+      - PUID=1234
+      - PGID=1234
+      - OMNIARR_TVMAZE_URL=http://mocks:18999/tvmaze
+      - OMNIARR_TMDB_URL=http://mocks:18999/tmdb/3
+      - OMNIARR_PODNAPISI_URL=http://mocks:18999/pod
+      - OMNIARR_OPENSUBTITLES_URL=http://mocks:18999/os/api/v1
+      - OMNIARR_DEFINITIONS_URL=http://mocks:18999/none.zip
+      - OMNIARR_INTERVAL_DOWNLOADS=2
+      - OMNIARR_FIRST_RUN_SCALE=100
+    volumes: [./work/config:/config, ./work/data:/data]
+    ports: ["18485:8484"]
+    depends_on: [mocks]
+  mocks:
+    image: omniarr:localtest
+    entrypoint: []
+    user: "1234:1234"
+    command: ["python", "-m", "tests.mocks", "--port", "18999", "--dir", "/"]
+    environment: [MOCK_HOST=mocks, MOCK_BIND=0.0.0.0]
+    volumes: [./work/data:/data]

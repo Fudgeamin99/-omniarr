@@ -1,0 +1,64 @@
+# Omniarr — TV + movies + indexers + subtitles in one app.
+#
+# 1. Change the two paths marked CHANGE ME (and PUID/PGID/TZ if needed).
+# 2. docker compose up -d --build
+# 3. Open http://<this-machine>:8484 and follow "Finish setup".
+#
+# Folder layout (one /data folder so finished downloads can be HARDLINKED into
+# your library — instant, no extra disk space, and the torrent keeps seeding):
+#
+#   /data/torrents        ← qBittorrent saves here
+#   /data/media/tv        ← TV library   (Plex / Jellyfin / Emby point here)
+#   /data/media/movies    ← Movie library
+
+services:
+  omniarr:
+    build: .
+    image: omniarr:latest
+    container_name: omniarr
+    environment:
+      - PUID=1000            # `id -u` on the host
+      - PGID=1000            # `id -g` on the host
+      - UMASK=002
+      - TZ=Europe/London
+    volumes:
+      - ./config:/config                 # database, logs, settings
+      - /srv/data:/data                  # CHANGE ME: the folder holding torrents/ and media/
+    ports:
+      - "8484:8484"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets Omniarr reach a qBittorrent running on this machine
+    depends_on:
+      - flaresolverr
+    restart: unless-stopped
+
+  # Solves Cloudflare "checking your browser" pages. Omniarr only uses it for sites that need it.
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=info
+      - TZ=Europe/London
+    restart: unless-stopped
+
+  # Optional: run qBittorrent here too (skip this if you already run it elsewhere).
+  # In Omniarr use address http://qbittorrent:8080. First-run password is printed in:
+  #   docker logs qbittorrent
+  # In qBittorrent set Options → Downloads → Default Save Path to /data/torrents
+  #
+  # qbittorrent:
+  #   image: lscr.io/linuxserver/qbittorrent:latest
+  #   container_name: qbittorrent
+  #   environment:
+  #     - PUID=1000
+  #     - PGID=1000
+  #     - TZ=Europe/London
+  #     - WEBUI_PORT=8080
+  #   volumes:
+  #     - ./qbittorrent:/config
+  #     - /srv/data:/data                # CHANGE ME: same folder as above
+  #   ports:
+  #     - "8080:8080"
+  #     - "6881:6881"
+  #     - "6881:6881/udp"
+  #   restart: unless-stopped

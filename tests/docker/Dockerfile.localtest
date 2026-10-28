@@ -1,0 +1,11 @@
+# Same layout as the real Dockerfile, but on a locally assembled base (no network in the build sandbox).
+FROM omniarr-localbase:test
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 OMNIARR_CONFIG=/config OMNIARR_PORT=8484 PATH=/usr/local/bin:/usr/bin:/bin
+WORKDIR /app
+COPY omniarr ./omniarr
+COPY definitions ./definitions
+COPY tests ./tests
+COPY docker/entrypoint.sh /entrypoint.sh
+EXPOSE 8484
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
+CMD ["python", "-m", "omniarr"]
