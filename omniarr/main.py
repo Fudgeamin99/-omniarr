@@ -14,7 +14,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from . import api, config, db, log, net, scheduler, search
-from .indexers import catalog
+from .indexers import catalog, defaults
 
 L = log.get("main")
 
@@ -46,6 +46,10 @@ async def lifespan(app):
     db.connect()
     L.info("Omniarr %s starting (config: %s)", config.VERSION, config.CONFIG_DIR)
     search.jobs.start()
+    try:
+        defaults.seed_on_first_start()
+    except Exception:
+        L.exception("Couldn't add the default public indexers")
     asyncio.create_task(catalog.summaries())   # warm the site list
     if config.SCHEDULER_ENABLED:
         scheduler.start()

@@ -42,7 +42,7 @@ def start() -> tuple[subprocess.Popen, subprocess.Popen]:
                "OMNIARR_OPENSUBTITLES_URL": f"{M}/os/api/v1", "OMNIARR_PODNAPISI_URL": f"{M}/pod",
                "OMNIARR_DEFINITIONS_URL": f"{M}/none.zip", "OMNIARR_INTERVAL_DOWNLOADS": "2",
                "OMNIARR_INTERVAL_RSS": "3600", "OMNIARR_INTERVAL_SUBTITLES": "3600",
-               "OMNIARR_FIRST_RUN_SCALE": "100"}
+               "OMNIARR_FIRST_RUN_SCALE": "100", "OMNIARR_NO_DEFAULT_INDEXERS": "1"}
     app = subprocess.Popen([sys.executable, "-m", "omniarr"], env=app_env,
                            stdout=open(WORK / "app.log", "w"), stderr=subprocess.STDOUT)
     for _ in range(100):

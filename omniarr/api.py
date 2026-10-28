@@ -19,7 +19,7 @@ from starlette.routing import Route
 
 from . import (config, db, downloads, library, log, naming, net, qbittorrent, quality, scheduler, search,
                settings)
-from .indexers import catalog, manager
+from .indexers import catalog, defaults, manager
 from .metadata import tmdb
 from .subtitles import manager as subs
 
@@ -868,6 +868,12 @@ async def indexer_test(request: Request):
 
 
 @endpoint
+async def indexers_add_recommended(request: Request):
+    added = defaults.add_recommended()
+    return {"added": added}
+
+
+@endpoint
 async def definitions(request: Request):
     q = (request.query_params.get("q") or "").lower().strip()
     t = request.query_params.get("type") or ""
@@ -953,6 +959,7 @@ routes = [
     Route("/api/indexers", indexers_list),
     Route("/api/indexers", indexer_create, methods=["POST"]),
     Route("/api/indexers/test", indexer_test_new, methods=["POST"]),
+    Route("/api/indexers/recommended", indexers_add_recommended, methods=["POST"]),
     Route("/api/indexers/{id:int}", indexer_update, methods=["PUT"]),
     Route("/api/indexers/{id:int}", indexer_delete, methods=["DELETE"]),
     Route("/api/indexers/{id:int}/test", indexer_test, methods=["POST"]),

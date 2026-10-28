@@ -987,8 +987,8 @@ function healthDot(h) { return { ok: 'ok', new: '', paused: 'warn', error: 'bad'
 function indexersSection() {
   const items = S.v.indexers || [];
   return html`<section class="card" id="sec-indexers" aria-label="Indexers">
-    <div class="card-head"><div><h2>Indexers</h2><div class="sub">Built in — replaces Prowlarr. Uses Prowlarr's site list, so most trackers are one click. Shared by TV and movies.</div></div><a class="btn" href="#/indexers/add" style="height:40px">+ Add indexer</a></div>
-    ${!items.length ? html`<div class="empty">${ic('search', 28, 1.5)}<span>No indexers yet — add the trackers you use.</span><a class="btn primary" href="#/indexers/add">Add indexer</a></div>`
+    <div class="card-head"><div><h2>Indexers</h2><div class="sub">Built in — replaces Prowlarr. Uses Prowlarr's site list, so most trackers are one click. Shared by TV and movies.</div></div><div class="row" style="gap:8px">${btn('Add recommended public sites', 'addRecommended', { cls: 'sm', busyKey: 'addRecommended', attrs: 'style="height:40px"' })}<a class="btn" href="#/indexers/add" style="height:40px">+ Add indexer</a></div></div>
+    ${!items.length ? html`<div class="empty">${ic('search', 28, 1.5)}<span>No indexers yet — add popular English public sites in one click, or add the trackers you use.</span><div class="row">${btn('Add recommended public sites', 'addRecommended', { cls: 'primary', busyKey: 'addRecommended' })}<a class="btn" href="#/indexers/add">Add indexer</a></div></div>`
     : html`<div class="col" style="gap:8px">${items.map((ix) => html`<div class="list-row click" data-act="editIndexer" data-id="${ix.id}" data-key="ix${ix.id}" style="border-radius:10px;background:var(--card2);border:0">
       <span class="grow" style="font-weight:500;flex-basis:160px">${ix.name}</span>
       <span class="chip">${ix.kind === 'torznab' ? 'Torznab' : ix.type === 'private' ? 'Private' : ix.type === 'semi-private' ? 'Semi-private' : 'Public'}</span>
@@ -998,6 +998,12 @@ function indexersSection() {
     </div>`)}</div>`}
   </section>`;
 }
+
+A.addRecommended = () => busy('addRecommended', async () => {
+  const r = await api('/api/indexers/recommended', { method: 'POST' });
+  toast(r.added.length ? `Added ${r.added.join(', ')}` : 'All recommended sites are already added', 'good');
+  S.v.indexers = (await api('/api/indexers')).items; await refreshStatus();
+});
 
 function unblockSection() {
   const u = S.form.unblock; const fs = S.ui.fsResult;

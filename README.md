@@ -79,6 +79,8 @@ services:
 - **Built-in indexers (replaces Prowlarr).** It ships with Prowlarr's 579 site definitions and updates them weekly.
   About 430 of them work out of the box. The rest are music/book-only sites or need a login captcha.
   Any Torznab link also works, e.g. an existing Jackett.
+- **Ready to search on first start.** A set of public indexers is added automatically, so searching works without any
+  setup. Delete any you don't want; **Add recommended public sites** in Connections → Indexers puts them back.
 - **Built-in subtitles (replaces Bazarr).** Subtitles come from OpenSubtitles.com and Podnapisi, matched to your exact release.
   Files that already have English subtitles inside them are skipped.
 - **English only.** By default it picks English audio or English dubs. Foreign-only and subbed-only anime are rejected.
@@ -142,8 +144,8 @@ Open `http://<NAS-IP>:8484`. The dashboard shows a **Finish setup** card until e
 - **Library folders:** already set to `/data/media/tv` and `/data/media/movies`. Nothing to do.
 - **Link qBittorrent:** Connections → qBittorrent → address `http://qbittorrent:8080`, plus the username and password
   from step 3 → **Test and save**.
-- **Indexers:** Connections → **+ Add indexer** → pick your trackers → enter your login, cookie or API key →
-  **Test and add**.
+- **Indexers:** some public indexers are already added for you, so searching works straight away. To add private trackers: Connections → **+ Add indexer** → pick the site → enter your login, cookie or
+  API key → **Test and add**.
 - **Movie info key:** create a free TMDB account → Settings → API → copy the key → Connections → Quality and info.
 - **Subtitles (optional):** Podnapisi works straight away. For OpenSubtitles.com (best coverage), add your free account
   plus an API key from opensubtitles.com → Profile → API consumers.

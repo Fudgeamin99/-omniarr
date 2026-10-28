@@ -74,6 +74,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     },
     "general": {
         "setup_dismissed": False,
+        "defaults_seeded": False,
     },
 }
 
